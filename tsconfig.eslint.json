@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "*.config.ts",
+    "eslint.config.js",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "exclude": ["node_modules", "dist", "coverage"],
+  "compilerOptions": {
+    "rootDir": ".",
+    // Required for type-aware linting with ESLint flat config
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  }
+}

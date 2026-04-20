@@ -1,0 +1,130 @@
+{
+  "name": "qbo-migrate",
+  "version": "1.1.0",
+  "description": "CLI tool to migrate data between QuickBooks Online companies with batching, retries, and dry-run support",
+  "keywords": [
+    "quickbooks",
+    "qbo",
+    "migration",
+    "accounting",
+    "cli",
+    "data-migration",
+    "intuit"
+  ],
+  "homepage": "https://github.com/ramiisaac/qbo-migrate#readme",
+  "bugs": {
+    "url": "https://github.com/ramiisaac/qbo-migrate/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ramiisaac/qbo-migrate"
+  },
+  "license": "MIT",
+  "author": "Rami Isaac <raisaac@icloud.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "qbo-migrate": "./bin/qbo-migrate.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "build:analyze": "tsx scripts/analyze-build.ts",
+    "dev": "tsup --watch",
+    "format": "prettier --write .",
+    "test": "vitest run --reporter=dot",
+    "test:coverage": "vitest run --coverage --reporter=dot",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint",
+    "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint",
+    "type-check": "tsc --noEmit --incremental --tsBuildInfoFile tsconfig.tsbuildinfo",
+    "check:types": "pnpm dlx @arethetypeswrong/cli@latest --pack --profile esm-only",
+    "prepublishOnly": "pnpm run build",
+    "release": "./scripts/release.sh",
+    "release:dry": "./scripts/release.sh --dry-run",
+    "semantic-release": "semantic-release",
+    "commit": "cz",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "chalk": "^5.5.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.0",
+    "dotenv": "^17.2.1",
+    "execa": "^9.6.0",
+    "fast-glob": "^3.3.3",
+    "inquirer": "^12.9.2",
+    "jsonc-parser": "^3.3.1",
+    "listr2": "^9.0.1",
+    "lodash": "^4.17.21",
+    "node-quickbooks": "^2.0.50",
+    "ora": "^8.2.0",
+    "p-limit": "^6.2.0",
+    "p-retry": "^6.2.1",
+    "terser": "^5.43.1"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@types/inquirer": "^9.0.9",
+    "@types/lodash": "^4.17.20",
+    "@types/node": "^24.2.1",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.6.2",
+    "semantic-release": "^24.2.7",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.39.1",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild@<=0.24.2": ">=0.25.0",
+      "tmp@<=0.2.3": ">=0.2.4"
+    }
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix"
+    ]
+  }
+}
