@@ -1,0 +1,301 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, beta, alpha]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        default: false
+        type: boolean
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Quick checks first - fail fast
+  lint-and-type:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1 # Shallow clone for speed
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Lint and type-check in parallel
+        run: |
+          pnpm run lint &
+          pnpm run type-check &
+          wait
+
+  test:
+    needs: lint-and-type # Only run tests if lint/type checks pass
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true # Stop all matrix jobs if one fails
+      matrix:
+        # Primary coverage job on Ubuntu + Node 20 (engines floor).
+        # Secondary jobs cover OS portability (macOS, Windows) and forward
+        # compatibility with Node 22 LTS.
+        include:
+          - os: ubuntu-latest
+            node-version: 20.x
+            coverage: true
+          - os: ubuntu-latest
+            node-version: 22.x
+            coverage: false
+          - os: macos-latest
+            node-version: 20.x
+            coverage: false
+          - os: windows-latest
+            node-version: 20.x
+            coverage: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.pnpm-store
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-modules-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-modules-
+
+      - name: Install dependencies
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist
+            tsconfig.tsbuildinfo
+          key: ${{ runner.os }}-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Test
+        run: |
+          if [[ "${{ matrix.coverage }}" == "true" ]]; then
+            pnpm run test:coverage
+          else
+            pnpm run test
+          fi
+        shell: bash
+
+      - name: Upload coverage
+        if: matrix.coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false # Don't fail CI if codecov is down
+
+  # Separate build job that can run in parallel with tests
+  build:
+    needs: lint-and-type
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.pnpm-store
+          key: ${{ runner.os }}-node-20-modules-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-20-modules-
+
+      - name: Install dependencies
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Create tarball and stage artifacts
+        run: |
+          pnpm pack
+          mkdir -p artifacts
+          mv *.tgz artifacts/
+          cp -r dist artifacts/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: artifacts/
+          retention-days: 1
+
+  release:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/alpha' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history needed for semantic-release
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.pnpm-store
+          key: ${{ runner.os }}-node-20-modules-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-20-modules-
+
+      - name: Install dependencies
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: artifacts/
+
+      - name: Restore build artifacts
+        run: |
+          cp -r artifacts/dist ./
+          mv artifacts/*.tgz ./
+
+      - name: Release to npm registry
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Configure npm auth for npmjs.org
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+
+          # Run semantic-release. When it publishes a new version, it updates
+          # package.json via @semantic-release/npm and commits via
+          # @semantic-release/git. We detect "a release happened" by comparing
+          # package.json version before/after. Dry-run short-circuits.
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            pnpm run semantic-release -- --dry-run
+            echo "new_release_published=false" >> "$GITHUB_OUTPUT"
+          else
+            VERSION_BEFORE=$(node -p "require('./package.json').version")
+            pnpm run semantic-release
+            VERSION_AFTER=$(node -p "require('./package.json').version")
+            if [[ "$VERSION_BEFORE" != "$VERSION_AFTER" ]]; then
+              echo "new_release_published=true" >> "$GITHUB_OUTPUT"
+              echo "new_release_version=$VERSION_AFTER" >> "$GITHUB_OUTPUT"
+            else
+              echo "new_release_published=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Publish to GitHub Packages
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.semantic.outputs.new_release_version }}"
+          echo "Publishing version ${VERSION} to GitHub Packages..."
+
+          # Create a scoped copy of package.json for GitHub Packages
+          node -e "
+            const pkg = require('./package.json');
+            const scopedPkg = {
+              ...pkg,
+              name: '@${{ github.repository_owner }}/' + pkg.name,
+              publishConfig: {
+                registry: 'https://npm.pkg.github.com'
+              }
+            };
+            require('fs').writeFileSync('package-ghp.json', JSON.stringify(scopedPkg, null, 2));
+          "
+
+          mv package.json package-original.json
+          mv package-ghp.json package.json
+
+          echo "@${{ github.repository_owner }}:registry=https://npm.pkg.github.com" > ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> ~/.npmrc
+
+          # Continue on error since the scoped package version may already exist
+          npm publish --registry https://npm.pkg.github.com || {
+            echo "::warning::GitHub Packages publish failed (version may already exist)"
+          }
+
+          mv package-original.json package.json
+          rm -f package-ghp.json
