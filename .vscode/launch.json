@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "name": "Lint",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm run lint"
+    }
+  ]
+}

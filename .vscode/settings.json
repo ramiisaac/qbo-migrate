@@ -1,0 +1,25 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true,
+    "**/*.tsbuildinfo": true,
+  },
+  "git.path": "/usr/bin/git",
+  "hide-files.files": [],
+  "terminal.integrated.env.linux": {
+    "PATH": "/usr/local/bin:${env:PATH}",
+  },
+  "terminal.integrated.env.osx": {
+    "PATH": "/usr/local/bin:/opt/homebrew/bin:${env:PATH}",
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/*.code-search": true,
+  },
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "github.copilot.chat.agent.thinkingTool": true,
+}
