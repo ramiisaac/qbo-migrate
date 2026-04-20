@@ -191,6 +191,11 @@ jobs:
       issues: write
       pull-requests: write
       packages: write
+    env:
+      # Skip husky hook installation in CI. semantic-release performs its own
+      # git commit for the release; our local-dev commit-msg hook (commitlint)
+      # would reject the auto-generated body containing long URL lines.
+      HUSKY: 0
 
     steps:
       - uses: actions/checkout@v4
